@@ -27,10 +27,13 @@ def products():
                 db.session.flush()
                 product_id = entry.id
                 db.session.commit()
-                return jsonify({"Msg":f"Succesfully created {product_name} product with {product_id = } and stock of 10."}), 201
+                return jsonify({"Msg":f"Succesfully created {product_name} product with product_id of {product_id} and stock of 10.", "product_id":product_id}), 201
             else:
                 return jsonify({"Error": f"{product_name} product already exists with stock {res.stock} available"}), 400
         except IntegrityError:
+            db.session.rollback()
+            return jsonify({"Error":"Internal Server Error"}), 400
+        except Exception:
             db.session.rollback()
             return jsonify({"Error":"Internal Server Error"}), 500
     else:
@@ -55,7 +58,7 @@ def purchase():
                     db.session.add(order_entry)
                     db.session.flush()
                     order_id = order_entry.id
-                    idempotent_key_status_update = db.update(IdempotencyKey).where(IdempotencyKey.key == idempotent_key).values(staus="Successfull")
+                    idempotent_key_status_update = db.update(IdempotencyKey).where(IdempotencyKey.key == idempotent_key).values(status="Successfull")
                     db.session.execute(idempotent_key_status_update)
                     idempotency_table_order_id = db.update(IdempotencyKey).where(IdempotencyKey.key == idempotent_key).values(order_id = order_id)
                     db.session.execute(idempotency_table_order_id)
@@ -63,6 +66,8 @@ def purchase():
                 else:
                     idempotent_key_status_update = db.update(IdempotencyKey).where(IdempotencyKey.key == idempotent_key).values(status="Out of Stock")
                     db.session.execute(idempotent_key_status_update)
+                    return jsonify({"Msg":"The product is out of stock."}), 200
+
 
         except IntegrityError:
             smt = db.select(IdempotencyKey).where(IdempotencyKey.key == idempotent_key)
